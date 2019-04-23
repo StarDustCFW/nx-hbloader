@@ -272,9 +272,25 @@ void loadNro(void)
     }
 
     if (strlen(g_nextNroPath) == 0)
-    {
-        strcpy(g_nextNroPath, "sdmc:/hbmenu.nro");
-        strcpy(g_nextArgv,    "sdmc:/hbmenu.nro");
+    {   //EDIT HERE
+        if (fopen("sdmc:/folder/folder/yournro.nro", "rb")) // Check if the nro can be read back, if it can, then it exists! If not, the next statement is checked (or executed if 'else' comes after)
+        {
+            strcpy(g_nextNroPath, "sdmc:/folder/folder/yournro.nro");
+            strcpy(g_nextArgv,    "sdmc:/folder/folder/yournro.nro");
+        }
+        
+        /*else if (fopen("sdmc:/.nro", "rb")) // You can add more 'if' 'if else' statements if you want to check for more locations.
+        {
+            strcpy(g_nextNroPath, "sdmc:/.nro");
+            strcpy(g_nextArgv,    "sdmc:/.nro");
+        }*/
+        
+        else
+        {
+            strcpy(g_nextNroPath, "sdmc:/hbmenu.nro"); // Using hbmenu as a fall back for if the nro in the previous 'if' statements isn't true...
+            strcpy(g_nextArgv,    "sdmc:/hbmenu.nro"); // Can be removed if needed.
+        }
+        //END
     }
 
     memcpy(g_argv, g_nextArgv, sizeof g_argv);
