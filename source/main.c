@@ -2,6 +2,7 @@
 #include <string.h>
 #include <stdio.h>
 
+#include <string.h>
 #define MODULE_HBL 347
 
 const char* g_easterEgg = "Do you mean to tell me that you're thinking seriously of building that way, when and if you are an architect?";
@@ -44,6 +45,14 @@ void __appInit(void)
     Result rc;
 
     rc = smInitialize();
+    if (R_FAILED(rc))
+        fatalSimple(MAKERESULT(MODULE_HBL, 1));
+
+    rc = hidsysInitialize();
+    if (R_FAILED(rc))
+        fatalSimple(MAKERESULT(MODULE_HBL, 1));
+
+    rc = hidInitialize();
     if (R_FAILED(rc))
         fatalSimple(MAKERESULT(MODULE_HBL, 1));
 
@@ -102,6 +111,32 @@ void setupHbHeap(void)
 
 static Handle g_port;
 static Handle g_procHandle;
+
+void showError(char* errorText1, char* errorText2, Result outrc)
+{
+    AppletHolder err;
+    AppletStorage errStor;
+    LibAppletArgs errArgs;
+
+    appletCreateLibraryApplet(&err, AppletId_error, LibAppletMode_AllForeground);
+    libappletArgsCreate(&errArgs, 1);
+    libappletArgsPush(&errArgs, &err);
+    appletCreateStorage(&errStor, 4120);
+    u8 args[4120] = {0};
+    args[0] = 1;
+
+    u64 e = (((outrc & 0x1ffu) + 2000) | (((outrc >> 9) & 0x1fff & 0x1fffll) << 32));
+    *(u64*)&args[8] = e;
+    strcpy((char*) &args[24], errorText1);
+    strcpy((char*) &args[2072], errorText2);
+    appletStorageWrite(&errStor, 0, args, 4120);
+    appletHolderPushInData(&err, &errStor);
+
+    appletHolderStart(&err);
+    appletHolderJoin(&err);
+    svcExitProcess();
+}
+
 
 void threadFunc(void* ctx)
 {
@@ -273,26 +308,46 @@ void loadNro(void)
 
     if (strlen(g_nextNroPath) == 0)
     {   //EDIT HERE
-        if (fopen("sdmc:/folder/folder/yournro.nro", "rb")) // Check if the nro can be read back, if it can, then it exists! If not, the next statement is checked (or executed if 'else' comes after)
+        if (fopen("sdmc:/reboot.nro", "rb")) // Check if the nro can be read back, if it can, then it exists! If not, the next statement is checked (or executed if 'else' comes after)
         {
-            strcpy(g_nextNroPath, "sdmc:/folder/folder/yournro.nro");
-            strcpy(g_nextArgv,    "sdmc:/folder/folder/yournro.nro");
-        }
-        
-        /*else if (fopen("sdmc:/.nro", "rb")) // You can add more 'if' 'if else' statements if you want to check for more locations.
-        {
-            strcpy(g_nextNroPath, "sdmc:/.nro");
-            strcpy(g_nextArgv,    "sdmc:/.nro");
-        }*/
-        
-        else
-        {
+			hidScanInput();
+			u64 kDown = hidKeysDown(CONTROLLER_P1_AUTO);
+            strcpy(g_nextNroPath, "sdmc:/reboot.nro");
+            strcpy(g_nextArgv,    "sdmc:/reboot.nro");
+			
+			
+			if ((kDown & KEY_A))
+			{
+            strcpy(g_nextNroPath, "sdmc:/hbmenu.nro");
+			strcpy(g_nextArgv,    "sdmc:/hbmenu.nro");
+			}
+			
+			if ((kDown & KEY_R))
+			{
+			strcpy(g_nextNroPath, "sdmc:/switch/tinfoil/tinfoil.nro");
+            strcpy(g_nextArgv,    "sdmc:/switch/tinfoil/tinfoil.nro");
+			}
+			
+			if ((kDown & KEY_B))
+			{
+            strcpy(g_nextNroPath, "sdmc:/hbmenu.nro");
+			strcpy(g_nextArgv,    "sdmc:/hbmenu.nro");
+			}
+
+        } else{
+			hidScanInput();
+			u64 kDown = hidKeysDown(CONTROLLER_P1_AUTO);
+			if ((kDown & KEY_R))
+			{
+			strcpy(g_nextNroPath, "sdmc:/switch/tinfoil/tinfoil.nro");
+            strcpy(g_nextArgv,    "sdmc:/switch/tinfoil/tinfoil.nro");
+			}else{
             strcpy(g_nextNroPath, "sdmc:/hbmenu.nro"); // Using hbmenu as a fall back for if the nro in the previous 'if' statements isn't true...
-            strcpy(g_nextArgv,    "sdmc:/hbmenu.nro"); // Can be removed if needed.
+			strcpy(g_nextArgv,    "sdmc:/hbmenu.nro"); // Can be removed if needed.
+			}
         }
         //END
     }
-
     memcpy(g_argv, g_nextArgv, sizeof g_argv);
 
     uint8_t *nrobuf = (uint8_t*) g_heapAddr;
@@ -446,11 +501,11 @@ void loadNro(void)
 int main(int argc, char **argv)
 {
     memcpy(g_savedTls, (u8*)armGetTls() + 0x100, 0x100);
-
     getIsApplication();
     getIsAutomaticGameplayRecording();
     setupHbHeap();
     getOwnProcessHandle();
+
     loadNro();
 
     fatalSimple(MAKERESULT(MODULE_HBL, 8));
